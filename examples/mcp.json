@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "siglent-sds800xhd": {
+      "type": "http",
+      "url": "http://localhost:8800/mcp"
+    }
+  }
+}

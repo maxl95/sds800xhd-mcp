@@ -1,0 +1,16 @@
+services:
+  sds800xhd-mcp:
+    build: .
+    image: sds800xhd-mcp:latest
+    container_name: sds800xhd-mcp
+    restart: unless-stopped
+    ports:
+      - "8800:8800"
+    volumes:
+      - sds-data:/data
+    # Optional: initial value if no config.json exists yet
+    # environment:
+    #   SIGLENT_IP: 192.0.2.10
+
+volumes:
+  sds-data:

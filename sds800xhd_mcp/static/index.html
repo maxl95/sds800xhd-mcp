@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDS800X HD MCP</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --fg: #1d2430; --muted: #667085; --border: #d8dce3;
+    --accent: #0b6bcb; --ok: #12805c; --err: #c4320a; --code: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --fg: #e6e8eb; --muted: #9aa3b2; --border: #343a44;
+            --accent: #5aa7ff; --ok: #3ccf91; --err: #ff7a59; --code: #262b33; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+            padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 120px; gap: 12px; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+                  background: var(--bg); color: var(--fg); font: inherit; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 14px; }
+  .check input { width: auto; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  button { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--card);
+           color: var(--fg); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .55; cursor: progress; }
+  .status { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.on { background: var(--ok); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 12px 0 0; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .msg { margin-top: 12px; font-size: 14px; min-height: 1.4em; }
+  .msg.err { color: var(--err); } .msg.ok { color: var(--ok); }
+  pre { background: var(--code); padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; margin: 0; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  img#shot { max-width: 100%; border-radius: 6px; border: 1px solid var(--border); margin-top: 12px; display: none; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Siglent SDS800X HD – MCP Server</h1>
+  <p class="sub">SCPI over VISA socket. Settings are stored persistently on the server.</p>
+
+  <section>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Loading…</span></div>
+    <dl id="statusDetails"></dl>
+  </section>
+
+  <section>
+    <h2>Oscilloscope connection</h2>
+    <form id="form" autocomplete="off">
+      <div class="grid">
+        <div>
+          <label for="host">IP address / hostname</label>
+          <input id="host" name="host" placeholder="192.168.1.100" required>
+        </div>
+        <div>
+          <label for="port">Port</label>
+          <input id="port" name="port" type="number" min="1" max="65535" value="5025">
+        </div>
+        <div class="full">
+          <label for="resource">VISA resource</label>
+          <input id="resource" name="resource" placeholder="TCPIP0::192.168.1.100::5025::SOCKET">
+          <div class="hint">Built from IP and port; changes here update IP and port.</div>
+        </div>
+        <div>
+          <label for="backend">VISA backend</label>
+          <select id="backend" name="visa_backend">
+            <option value="@py">PyVISA-py (no driver)</option>
+            <option value="">System VISA (NI-VISA etc.)</option>
+          </select>
+        </div>
+        <div>
+          <label for="timeout">Timeout (ms)</label>
+          <input id="timeout" name="timeout_ms" type="number" min="500" max="120000" step="100" value="5000">
+        </div>
+        <div class="full">
+          <label class="check"><input id="auto" type="checkbox" name="auto_connect">
+            Connect automatically (on startup and reconnect when needed)</label>
+        </div>
+      </div>
+      <div class="buttons">
+        <button type="submit" class="primary" data-connect="1">Save &amp; connect</button>
+        <button type="submit" data-connect="0">Save only</button>
+        <button type="button" id="disconnect">Disconnect</button>
+        <button type="button" id="shotBtn">Screenshot</button>
+      </div>
+      <div class="msg" id="msg" role="status"></div>
+    </form>
+    <img id="shot" alt="Oscilloscope screenshot">
+  </section>
+
+  <section>
+    <h2>Set up an MCP client</h2>
+    <p class="hint" style="margin-top:0">Endpoint (Streamable HTTP): <code id="endpoint"></code></p>
+    <pre id="snippet"></pre>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const RES = /^TCPIP(\d*)::([^:]+)::(\d+)::SOCKET$/i;
+let busy = false;
+
+function buildResource() {
+  const h = $("host").value.trim(), p = $("port").value.trim() || "5025";
+  $("resource").value = h ? `TCPIP0::${h}::${p}::SOCKET` : "";
+}
+$("host").addEventListener("input", buildResource);
+$("port").addEventListener("input", buildResource);
+$("resource").addEventListener("input", () => {
+  const m = $("resource").value.trim().match(RES);
+  if (m) { $("host").value = m[2]; $("port").value = m[3]; }
+});
+
+function setMsg(text, kind) { $("msg").textContent = text || ""; $("msg").className = "msg " + (kind || ""); }
+
+function fmtTime(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "–"; }
+
+function render(state, fillForm) {
+  const st = state.status, cfg = state.config;
+  $("dot").classList.toggle("on", st.connected);
+  $("statusText").textContent = st.connected ? "Connected" : "Not connected";
+  const rows = st.connected
+    ? [["Device", st.idn], ["Resource", st.resource], ["Since", fmtTime(st.connected_since)]]
+    : [["Configured", cfg.resource || "–"]];
+  if (st.last_error) rows.push(["Last error", st.last_error]);
+  $("statusDetails").replaceChildren(...rows.flatMap(([k, v]) => {
+    const dt = document.createElement("dt"); dt.textContent = k;
+    const dd = document.createElement("dd"); dd.textContent = v; return [dt, dd];
+  }));
+  if (fillForm) {
+    $("host").value = cfg.host; $("port").value = cfg.port; $("resource").value = cfg.resource;
+    $("backend").value = cfg.visa_backend; $("timeout").value = cfg.timeout_ms; $("auto").checked = cfg.auto_connect;
+  }
+  const url = location.origin + state.mcp_path;
+  $("endpoint").textContent = url;
+  $("snippet").textContent = JSON.stringify({ mcpServers: { "siglent-sds800xhd": { type: "http", url } } }, null, 2);
+}
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  const data = await r.json();
+  if (!r.ok && !data.status) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+async function act(fn) {
+  if (busy) return;
+  busy = true; document.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  try { await fn(); } catch (e) { setMsg(e.message, "err"); }
+  finally { busy = false; document.querySelectorAll("button").forEach((b) => (b.disabled = false)); }
+}
+
+$("form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const connect = ev.submitter?.dataset.connect === "1";
+  act(async () => {
+    setMsg(connect ? "Saving and connecting…" : "Saving…");
+    const data = await api("/api/config", {
+      host: $("host").value.trim(), port: Number($("port").value), resource_override: $("resource").value.trim(),
+      visa_backend: $("backend").value, timeout_ms: Number($("timeout").value), auto_connect: $("auto").checked, connect,
+    });
+    render(data, true);
+    if (data.ok) setMsg(connect ? "Saved and connected." : "Saved.", "ok");
+    else setMsg(data.error, "err");
+  });
+});
+
+$("disconnect").addEventListener("click", () => act(async () => {
+  render(await api("/api/disconnect", {}), false); setMsg("Disconnected.", "ok");
+}));
+
+$("shotBtn").addEventListener("click", () => act(async () => {
+  setMsg("Fetching screenshot…");
+  const r = await fetch("/api/screenshot");
+  if (!r.ok) throw new Error((await r.json()).error);
+  const img = $("shot"); URL.revokeObjectURL(img.src);
+  img.src = URL.createObjectURL(await r.blob()); img.style.display = "block"; setMsg("");
+}));
+
+async function poll(first) {
+  try { render(await api("/api/state"), first); } catch (e) { if (first) setMsg(e.message, "err"); }
+}
+poll(true);
+setInterval(() => { if (!busy) poll(false); }, 3000);
+</script>
+</body>
+</html>
